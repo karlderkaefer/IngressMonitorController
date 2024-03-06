@@ -30,7 +30,7 @@ type PingdomMonitorService struct {
 	client            *pingdom.Client
 }
 
-func (monitor *PingdomMonitorService) Equal(oldMonitor models.Monitor, newMonitor models.Monitor) bool {
+func (service *PingdomMonitorService) Equal(oldMonitor models.Monitor, newMonitor models.Monitor) bool {
 	// TODO: Retrieve oldMonitor config and compare it here
 	return false
 }
@@ -104,7 +104,7 @@ func (service *PingdomMonitorService) Update(m models.Monitor) {
 	if err != nil {
 		log.Info(fmt.Sprintf("Error updating Monitor %s %v", m.Name, err.Error()))
 	} else {
-		log.Info("Sucessfully updated Monitor "+m.Name, "Response", resp.Message)
+		log.Info("Successfully updated Monitor "+m.Name, "Response", resp.Message)
 	}
 }
 
@@ -115,7 +115,7 @@ func (service *PingdomMonitorService) Remove(m models.Monitor) {
 	if err != nil {
 		log.Info(fmt.Sprintf("Error deleting Monitor %s %v", m.Name, err.Error()))
 	} else {
-		log.Info("Sucessfully deleted Monitor "+m.Name, "Response", resp.Message)
+		log.Info("Successfully deleted Monitor "+m.Name, "Response", resp.Message)
 	}
 }
 
@@ -226,8 +226,30 @@ func (service *PingdomMonitorService) addConfigToHttpCheck(httpCheck *pingdom.Ht
 		httpCheck.RequestHeaders = make(map[string]string)
 		err := json.Unmarshal([]byte(providerConfig.RequestHeaders), &httpCheck.RequestHeaders)
 		if err != nil {
-			log.Info("Error Converting from string to JSON object")
+			log.Info("Error converting requestHeaders from string to JSON object", "value", providerConfig.RequestHeaders, "err", err)
 		}
+	}
+	if providerConfig != nil && len(providerConfig.RequestHeadersEnvVar) > 0 {
+		requestHeaderEnvValue := os.Getenv(providerConfig.RequestHeadersEnvVar)
+		if requestHeaderEnvValue != "" {
+			requestHeadersValue := make(map[string]string)
+			err := json.Unmarshal([]byte(requestHeaderEnvValue), &requestHeadersValue)
+			if err != nil {
+				log.Info("Error converting requestHeadersEnvVar from string to JSON object", "envVar", providerConfig.RequestHeadersEnvVar, "err", err)
+			}
+
+			if httpCheck.RequestHeaders != nil {
+				for key, value := range requestHeadersValue {
+					httpCheck.RequestHeaders[key] = value
+				}
+			} else {
+				httpCheck.RequestHeaders = requestHeadersValue
+			}
+
+		} else {
+			log.Error(errors.New("error reading request headers from environment variable"), "Environment Variable does not exist", "envVar", providerConfig.RequestHeadersEnvVar)
+		}
+
 	}
 
 	if providerConfig != nil && len(providerConfig.BasicAuthUser) > 0 {
@@ -240,7 +262,7 @@ func (service *PingdomMonitorService) addConfigToHttpCheck(httpCheck *pingdom.Ht
 			httpCheck.Username = providerConfig.BasicAuthUser
 			httpCheck.Password = passwordValue
 		} else {
-			log.Info("Error reading basic auth password from environment variable")
+			log.Error(errors.New("error reading basic auth password from environment variable"), "Environment Variable does not exist", "envVar", providerConfig.BasicAuthUser)
 		}
 	}
 
@@ -266,7 +288,7 @@ func (service *PingdomMonitorService) addConfigToHttpCheck(httpCheck *pingdom.Ht
 			if postDataValue != "" {
 				httpCheck.PostData = postDataValue
 			} else {
-				log.Error(errors.New("error reading post data from environment variable"), "Environment Variable %s does not exist", providerConfig.PostDataEnvVar)
+				log.Error(errors.New("error reading post data from environment variable"), "Environment Variable does not exist", "envVar", providerConfig.PostDataEnvVar)
 			}
 		}
 	}
