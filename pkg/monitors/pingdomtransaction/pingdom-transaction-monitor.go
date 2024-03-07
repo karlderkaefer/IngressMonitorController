@@ -40,7 +40,7 @@ type PingdomTransactionMonitorService struct {
 	namespace         string
 }
 
-func (monitor *PingdomTransactionMonitorService) Equal(oldMonitor models.Monitor, newMonitor models.Monitor) bool {
+func (service *PingdomTransactionMonitorService) Equal(oldMonitor models.Monitor, newMonitor models.Monitor) bool {
 	// TODO: Retrieve oldMonitor config and compare it here
 	return false
 }
@@ -105,7 +105,7 @@ func (service *PingdomTransactionMonitorService) GetAll() []models.Monitor {
 func (service *PingdomTransactionMonitorService) GetUrlFromSteps(id int64) string {
 	check, _, err := service.client.TMSChecksAPI.GetCheck(service.context, id).Execute()
 	if err != nil {
-		log.Error(err, "Error getting transaction check")
+		log.Error(err, "Error getting transaction check", "id", id)
 		return ""
 	}
 	if check == nil {
@@ -140,10 +140,10 @@ func (service *PingdomTransactionMonitorService) Update(m models.Monitor) {
 	monitorID := util.StrToInt64(m.ID)
 	_, resp, err := service.client.TMSChecksAPI.ModifyCheck(service.context, monitorID).CheckWithoutIDPUT(*transactionCheck.AsPut()).Execute()
 	if err != nil {
-		log.Error(err, "Error Updating Pingdom Transaction Monitor", "Response", parseResponseBody(resp))
+		log.Error(err, "Error updating Pingdom Transaction Monitor", "Response", parseResponseBody(resp))
 		return
 	}
-	log.Info("Updated Pingdom Transaction Monitor Monitor " + m.Name)
+	log.Info("Successfully updated Pingdom Transaction Monitor " + m.Name)
 }
 
 func (service *PingdomTransactionMonitorService) Remove(m models.Monitor) {
@@ -177,19 +177,19 @@ func (service *PingdomTransactionMonitorService) createTransactionCheck(monitor 
 	if teamAlertContacts != nil {
 		transactionCheck.TeamIds = teamAlertContacts
 	}
-	service.addConfigToTranscationCheck(transactionCheck, monitor)
+	service.addConfigToTransactionCheck(transactionCheck, monitor)
 
 	return transactionCheck
 }
 
-func (service *PingdomTransactionMonitorService) addConfigToTranscationCheck(transactionCheck *pingdomNew.CheckWithoutID, monitor models.Monitor) {
+func (service *PingdomTransactionMonitorService) addConfigToTransactionCheck(transactionCheck *pingdomNew.CheckWithoutID, monitor models.Monitor) {
 
 	// Retrieve provider configuration
 	config := monitor.Config
 	providerConfig, _ := config.(*endpointmonitorv1alpha1.PingdomTransactionConfig)
 
 	if providerConfig == nil {
-		// providerConfig is not set, we create a go_to transaction by default from url because its required by API
+		// providerConfig is not set, we create a go_to transaction by default from url because it's required by API
 		transactionCheck.Steps = append(transactionCheck.Steps, pingdomNew.Step{
 			Args: &pingdomNew.StepArgs{
 				Url: ptr.String(monitor.URL),
@@ -233,7 +233,7 @@ func (service *PingdomTransactionMonitorService) addConfigToTranscationCheck(tra
 		transactionCheck.SeverityLevel = ptr.String(providerConfig.SeverityLevel)
 	}
 	if providerConfig.Interval > 0 {
-		transactionCheck.Interval = ptr.Int64((int64(providerConfig.Interval)))
+		transactionCheck.Interval = ptr.Int64(int64(providerConfig.Interval))
 	}
 	for _, step := range providerConfig.Steps {
 		args := service.NewStepArgsByMap(step.Args)
@@ -369,7 +369,7 @@ func parseResponseBody(resp *http.Response) string {
 	// Attempt to unmarshal the response body into a map
 	var responseBodyMap map[string]map[string]interface{}
 	if err := json.Unmarshal(bodyBytes, &responseBodyMap); err != nil {
-		// If unmarshaling fails, return the whole body as a string.
+		// If unmarshalling fails, return the whole body as a string.
 		return string(bodyBytes)
 	}
 	// Check if "error" key exists in the map
