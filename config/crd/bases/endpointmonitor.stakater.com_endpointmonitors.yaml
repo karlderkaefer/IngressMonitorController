@@ -99,7 +99,7 @@ spec:
                     description: Custom request headers
                     type: string
                   requestHeadersEnvVar:
-                    description: Custom request headers that should be read from an 
+                    description: Custom request headers that should be read from an
                       environment variable as it possibly contains sensitive data.
                       An example would be an API token.
                     type: string
